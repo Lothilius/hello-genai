@@ -13,8 +13,8 @@ echo "Using LLM model: $LLM_MODEL_NAME"
 
 # Pull the Docker model
 echo "Pulling Docker model..."
-docker model pull $LLM_MODEL_NAME
+podman model pull $LLM_MODEL_NAME
 
 # Build and run Docker container
 echo "Running Docker Compose..."
-docker compose up --build
+podman compose up --build

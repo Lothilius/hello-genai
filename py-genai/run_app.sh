@@ -2,7 +2,7 @@
 
 # Set default environment variables
 export PORT=${PORT:-8081}
-export DEBUG=${DEBUG:-false}
+export DEBUG=${DEBUG:-true}
 export LOG_LEVEL=${LOG_LEVEL:-INFO}
 
 # Print configuration

@@ -1,38 +1,44 @@
 services:
-  go-genai:
-    build:
-      context: ./go-genai
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-    env_file:
-      - .env
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+#  go-genai:
+#    build:
+#      context: ./go-genai
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8080:8080"
+#    environment:
+#      - PORT=8080
+#    env_file:
+#      - .env
+#    restart: unless-stopped
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 10s
 
   python-genai:
     build:
       context: ./py-genai
       dockerfile: Dockerfile
+    networks:
+      hello-genai-network:
+        ipv4_address: 10.89.1.2
     ports:
       - "8081:8081"
     environment:
       - PORT=8081
       - LOG_LEVEL=INFO
+      - MCP_SERVER_URL=http://10.89.1.4:8084
     env_file:
       - .env
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+#    depends_on:
+#      - mcp-server
+#    extra_hosts:
+#      - "ollama:127.0.0.1:11434"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -42,47 +48,113 @@ services:
     volumes:
       - ./py-genai:/app
 
-  node-genai:
-    build:
-      context: ./node-genai
-      dockerfile: Dockerfile
-    ports:
-      - "8082:8082"
-    environment:
-      - PORT=8082
-    env_file:
-      - .env
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+#  node-genai:
+#    build:
+#      context: ./node-genai
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8082:8082"
+#    environment:
+#      - PORT=8082
+#    env_file:
+#      - .env
+#    restart: unless-stopped
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 10s
+#
+#  rust-genai:
+#    build:
+#      context: ./rust-genai
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8083:8083"
+#    environment:
+#      - PORT=8083
+#    env_file:
+#      - .env
+#    restart: unless-stopped
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 10s
 
-  rust-genai:
-    build:
-      context: ./rust-genai
-      dockerfile: Dockerfile
+  ollama:
+    image: ollama/ollama:latest
+    networks:
+      hello-genai-network:
+        ipv4_address: 10.89.1.3
+    container_name: ollama
     ports:
-      - "8083:8083"
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+#      - ./scripts/start-ollama.sh:/start-ollama.sh
     environment:
-      - PORT=8083
-    env_file:
-      - .env
+      - OLLAMA_HOST=10.89.1.3
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+#    entrypoint: ["ollama run llama3"]
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 20s
+
+  mcp-server:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    networks:
+      hello-genai-network:
+        ipv4_address: 10.89.1.4
+    container_name: mcp-server
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./mcp:/app
+    environment:
+      - LOG_LEVEL=INFO
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8084
+      - OLLAMA_HOST=http://ollama:11434
+    env_file:
+      - .env
+    restart: unless-stopped
+#    depends_on:
+#      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 networks:
-  default:
+  hello-genai-network:
     name: hello-genai-network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.1.0/24
+          gateway: 10.89.1.1
+
+volumes:
+  ollama-data:
+    name: ollama-data
